@@ -1,67 +1,83 @@
 Flickr's ID generation strategy is based on creating **unique identifiers** that are both **globally unique** and **time-ordered**. The method uses a **64-bit** integer, which allows for a huge number of unique IDs that can be generated without collision.
 
-Flickr's strategy involves:
+<img width="703" alt="Screenshot 2024-11-29 at 11 56 34 PM" src="https://github.com/user-attachments/assets/3d054631-574a-4547-9301-3763be54df9b">
 
-1. **Timestamp-based prefix**: The first part of the ID is a timestamp, which is used to ensure that the IDs are unique and ordered over time. The timestamp is typically expressed in milliseconds or seconds.
-   
-2. **Sharding/Node identifier**: A part of the ID is used to uniquely identify the server or node that generated the ID, ensuring that multiple nodes can generate IDs independently without collisions.
-   
-3. **Sequence number**: The remaining part of the ID is a sequence number, which is incremented for each ID generated on a given node. This ensures that multiple IDs can be generated within the same millisecond without collisions.
+# H2 Upsert Benchmark
 
-### Breakdown of Flickr’s 64-bit ID structure:
+## Overview
 
-- **Timestamp (41 bits)**: This represents the time in milliseconds since a custom epoch. The time is stored as a 41-bit number, which gives a very large range for the timestamp. This means IDs will stay unique for many years.
-  
-- **Node identifier (10 bits)**: This part represents the node or machine that generated the ID. If there are 1024 nodes, 10 bits can accommodate all possible nodes.
-  
-- **Sequence number (12 bits)**: A 12-bit counter is used to ensure uniqueness when multiple IDs are generated within the same millisecond.
+This project benchmarks the performance of **upsert** operations (insert or update) using **H2 in-memory database**. An **upsert** is a database operation that inserts a record if it doesn’t exist, or updates the record if it does. The project simulates performing **1 million upserts** on a table, measures the time taken for these operations, and prints the result.
 
-### Structure of the ID
+The **H2 in-memory database** is used for this benchmark to avoid disk IO overhead and focus solely on the database's performance in handling upsert operations.
 
-```text
-+------------+--------------+---------------------+
-| Timestamp  | Node ID      | Sequence Number     |
-+------------+--------------+---------------------+
-| 41 bits    | 10 bits      | 12 bits             |
-+------------+--------------+---------------------+
+## Features
+
+- **H2 In-Memory Database**: The database runs in memory, providing faster data access without writing to disk.
+- **Upsert (MERGE)**: Efficiently inserts or updates records using the SQL **MERGE** statement.
+- **Batch Processing**: Inserts/updates are batched into a single operation to minimize execution overhead.
+- **Benchmarking**: Measures and reports the time taken to perform **1 million upsert operations**.
+
+## Technologies Used
+
+- **H2 In-Memory Database**: A lightweight relational database that stores data in memory.
+- **Java JDBC**: Java Database Connectivity to interact with the H2 database.
+- **SQL MERGE Statement**: Handles both insert and update in a single operation.
+- **Batch Processing**: Groups multiple SQL operations into a batch for more efficient execution.
+
+## Setup Instructions
+
+### Prerequisites
+
+- **Java**: You need to have Java 8 or higher installed.
+- **Maven**: Maven is used to manage the project dependencies.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/your-username/h2-upsert-benchmark.git
+cd h2-upsert-benchmark
 ```
 
-### How does it work in practice?
+### 2. Compile and Run the Project
 
-- The **timestamp** is the most significant part of the ID and ensures that IDs are ordered by time. When two nodes are generating IDs at the same time, the **sequence number** ensures that the IDs remain unique even if they are generated in the same millisecond.
-- The **node ID** part allows for ID generation on multiple machines (nodes) without collisions, and it prevents the need for coordination between different nodes. Each node has a unique identifier that is part of the ID.
-- The **sequence number** starts at `0` for each millisecond and is incremented with each new ID generated. If a node generates more than one ID per millisecond, the sequence number ensures that these IDs are unique even if they are generated at the same time.
+To build and run the project, execute the following command:
 
-### ID Generation Example (in Java):
-
-Here is a simplified implementation of Flickr’s ID generation method, using a similar approach with a 64-bit ID structure. We’ll use the current time (in milliseconds), a node identifier, and a sequence number to create unique IDs.
-e Code:
-
-- **`CUSTOM_EPOCH`**: A custom epoch timestamp (2010-01-01 00:00:00 in this case) is used as the reference point for generating the timestamp.
-  
-- **`nodeId`**: A unique identifier for the node (server) generating the ID. This can be any number, but it should be unique across nodes. Here, we use 10 bits to accommodate up to 1024 nodes.
-
-- **`sequence`**: A counter that increments for each ID generated in the same millisecond. If the counter exceeds the maximum value for the sequence, it waits for the next millisecond.
-
-- **`generateId()`**: This method generates the ID by combining the timestamp, node ID, and sequence number. It ensures that IDs are unique even if generated within the same millisecond by incrementing the sequence number. If the sequence overflows, it waits for the next millisecond to generate a new ID.
-
-- **`waitForNextMillis()`**: This method ensures that the generator waits until the next millisecond if the sequence number overflows.
-
-### Output Example:
-
-```
-Generated ID: 380024297547288064
-Generated ID: 380024297547288065
-Generated ID: 380024297547288066
-Generated ID: 380024297547288067
-Generated ID: 380024297547288068
-Generated ID: 380024297547288069
-Generated ID: 380024297547288070
-Generated ID: 380024297547288071
-Generated ID: 380024297547288072
-Generated ID: 380024297547288073
+```bash
+mvn clean install
+mvn exec:java
 ```
 
-### Conclusion:
+This will start the program, connect to an H2 in-memory database, and execute the benchmarking logic.
 
-This implementation follows Flickr's ID generation strategy with some simplifications. It generates globally unique IDs that are time-ordered and can scale across multiple nodes. This method ensures that IDs are unique, even when multiple nodes are generating IDs concurrently, and it also ensures that IDs are ordered by time. This approach is highly useful for distributed systems that require globally unique identifiers without requiring complex coordination mechanisms.
+## Code Explanation
+
+1. **H2 In-Memory Database**:
+   - A connection is established to an in-memory H2 database using JDBC.
+   - The connection URL is `jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1`, which keeps the database alive while the JVM is running.
+
+2. **Table Creation**:
+   - The `users` table is created with two columns: `ID` (the primary key) and `Age`.
+
+3. **Upsert Operation**:
+   - The program uses the SQL **MERGE** statement to either insert or update a record in the `users` table.
+   - It batches 1 million upsert operations into a single transaction to minimize execution overhead.
+
+4. **Benchmarking**:
+   - The time taken to perform the 1 million upserts is measured in nanoseconds and then converted to milliseconds.
+   - The final result is printed to the console.
+
+## Expected Output
+
+After running the program, you should see output similar to the following:
+
+```
+Time taken for 1 million upserts: 500 ms
+```
+
+This shows the total time it took to perform **1 million upserts** in the H2 in-memory database.
+
+## Use Cases
+
+- **Performance Benchmarking**: This project provides a benchmark for upsert operations, helping developers evaluate the speed of this operation in an in-memory database.
+- **Learning SQL MERGE**: The project demonstrates how to use the **MERGE** statement in SQL for efficiently inserting or updating records.
+- **In-Memory Database Usage**: The project shows how to use an in-memory database for fast, temporary data storage and processing.
